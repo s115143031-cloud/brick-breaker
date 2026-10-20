@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>打磚塊遊戲</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0f172a;color:#e5e7eb;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;justify-content:center;min-height:100vh;padding:24px}
+.wrap{width:min(760px,100%)}h1{text-align:center;margin:0 0 14px;font-size:30px}.stats{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}.stat{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:8px 14px}canvas{display:block;width:100%;background:#111827;border:1px solid #334155;border-radius:14px;touch-action:none}.actions{text-align:center;margin:14px 0}.actions button{padding:10px 18px;margin:4px;border:0;border-radius:9px;cursor:pointer;font-weight:700}.start{background:#38bdf8}.restart{background:#e2e8f0}.hint{text-align:center;color:#94a3b8;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>🎮 打磚塊</h1>
+<div class="stats">
+<div class="stat">分數：<b id="score">0</b></div>
+<div class="stat">生命：<b id="lives">3</b></div>
+<div class="stat">關卡：<b id="level">1</b></div>
+</div>
+<canvas id="game" width="720" height="480"></canvas>
+<div class="actions">
+<button class="start" id="start">開始遊戲</button>
+<button class="restart" id="restart">重新開始</button>
+</div>
+<div class="hint">電腦：← → 移動擋板　｜　手機：手指左右滑動</div>
+</div>
+<script>
+const c=document.getElementById("game"),x=c.getContext("2d"),W=c.width,H=c.height;
+const scoreEl=document.getElementById("score"),livesEl=document.getElementById("lives"),levelEl=document.getElementById("level");
+let score=0,lives=3,level=1,running=false,over=false,raf;
+let paddle={x:305,y:445,w:110,h:12},ball={x:360,y:430,r:8,dx:4,dy:-4},bricks=[];
+const keys={l:false,r:false};
+function build(){bricks=[];let rows=Math.min(3+level,6),cols=9,bw=68,bh=20,g=8,start=(W-(cols*bw+(cols-1)*g))/2;
+for(let r=0;r<rows;r++)for(let q=0;q<cols;q++)bricks.push({x:start+q*(bw+g),y:55+r*(bh+g),w:bw,h:bh,on:true,row:r})}
+function resetBall(){ball={x:paddle.x+paddle.w/2,y:paddle.y-12,r:8,dx:Math.random()>.5?4:-4,dy:-4}}
+function ui(){scoreEl.textContent=score;livesEl.textContent=lives;levelEl.textContent=level}
+function reset(){score=0;lives=3;level=1;running=false;over=false;paddle.x=305;build();resetBall();ui();draw()}
+function start(){if(over)reset();running=true;loop()}
+function lose(){lives--;ui();if(lives<=0){running=false;over=true;draw();return}running=false;resetBall();draw()}
+function next(){level++;score+=100;build();resetBall();running=false;ui();draw()}
+function update(){
+if(keys.l)paddle.x-=8;if(keys.r)paddle.x+=8;paddle.x=Math.max(0,Math.min(W-paddle.w,paddle.x));
+ball.x+=ball.dx;ball.y+=ball.dy;
+if(ball.x-ball.r<0){ball.x=ball.r;ball.dx=Math.abs(ball.dx)}if(ball.x+ball.r>W){ball.x=W-ball.r;ball.dx=-Math.abs(ball.dx)}if(ball.y-ball.r<0){ball.y=ball.r;ball.dy=Math.abs(ball.dy)}
+if(ball.y+ball.r>H){lose();return}
+if(ball.dy>0&&ball.x>paddle.x&&ball.x<paddle.x+paddle.w&&ball.y+ball.r>paddle.y){let hit=(ball.x-(paddle.x+paddle.w/2))/(paddle.w/2);ball.dx=hit*5;ball.dy=-Math.abs(ball.dy)}
+for(const b of bricks){if(!b.on)continue;if(ball.x+ball.r>b.x&&ball.x-ball.r<b.x+b.w&&ball.y+ball.r>b.y&&ball.y-ball.r<b.y+b.h){b.on=false;score+=10;ui();ball.dy*=-1;break}}
+if(bricks.every(b=>!b.on))next()
+}
+function draw(){
+x.fillStyle="#111827";x.fillRect(0,0,W,H);
+for(const b of bricks)if(b.on){x.fillStyle=["#38bdf8","#4ade80","#facc15","#f472b6","#a78bfa","#fb923c"][b.row%6];x.fillRect(b.x,b.y,b.w,b.h)}
+x.fillStyle="#f8fafc";x.fillRect(paddle.x,paddle.y,paddle.w,paddle.h);x.beginPath();x.arc(ball.x,ball.y,ball.r,0,Math.PI*2);x.fill();
+if(!running){x.fillStyle="rgba(0,0,0,.45)";x.fillRect(0,0,W,H);x.fillStyle="#fff";x.textAlign="center";x.font="bold 28px system-ui";x.fillText(over?"GAME OVER":"準備好了嗎？",W/2,H/2);x.font="16px system-ui";x.fillText(over?"按重新開始":"按開始遊戲",W/2,H/2+32);x.textAlign="left"}
+}
+function loop(){if(!running)return;update();draw();raf=requestAnimationFrame(loop)}
+addEventListener("keydown",e=>{if(e.key==="ArrowLeft")keys.l=true;if(e.key==="ArrowRight")keys.r=true;if(e.key===" "&&!running&&!over)start()});
+addEventListener("keyup",e=>{if(e.key==="ArrowLeft")keys.l=false;if(e.key==="ArrowRight")keys.r=false});
+let touchX=null;c.addEventListener("pointermove",e=>{let r=c.getBoundingClientRect();paddle.x=(e.clientX-r.left)*W/r.width-paddle.w/2;paddle.x=Math.max(0,Math.min(W-paddle.w,paddle.x))});
+c.addEventListener("pointerdown",()=>{if(!running&&!over)start()});
+document.getElementById("start").onclick=start;document.getElementById("restart").onclick=reset;
+reset();
+</script>
+</body>
+</html>
